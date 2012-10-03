@@ -17,7 +17,7 @@
  * along with OCLEx. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package particles;
+package pso;
 
 import java.nio.FloatBuffer;
 import java.util.List;
@@ -40,36 +40,44 @@ import org.lwjgl.opengl.DisplayMode;
 import static org.lwjgl.opencl.CL10.*;
 import static org.lwjgl.opengl.GL11.*;
 
-public class Particles {
-	final int np = 100;
+public class PSO {
+	final int pso_np = 100;
 	FloatBuffer x;
 	FloatBuffer y;
 	FloatBuffer vx;
 	FloatBuffer vy;
+	FloatBuffer fit;
 	
 	CLPlatform platform;
  List<CLDevice> devices;
  CLContext context;
  CLCommandQueue queue;
 	
-	CLMem xMem, yMem, vxMem, vyMem;
+	CLMem xMem, yMem, vxMem, vyMem, fitMem;
 	
 	PointerBuffer kernel1DGlobalWorkSize;
 	CLProgram program;
 	CLKernel kernel;
 	
+	final ObjectiveFunction of = new Rastrigin();
+	final float[][] dom = {{-5.12f, 5.12f},{-5.12f, 5.12f}};
+	final int rezx = 200;
+	final int rezy = 200;
+	
 	void start() throws LWJGLException {
 		initCL();
 		initGL();
+		initSurface();
   loop();
+  Surface.release();
   freeGL();
   freeCL();
 	}
 	
 	void initGL() {
 		try {
-   Display.setDisplayMode(new DisplayMode(800,600));
-   Display.setTitle("OpenCL Particle Demo");
+   Display.setDisplayMode(new DisplayMode(600,600));
+   Display.setTitle("OpenCL Particle Swarm Optimization Demo");
    Display.create();
   } catch (LWJGLException e) {
    e.printStackTrace();
@@ -78,8 +86,42 @@ public class Particles {
   }
 		
 		glMatrixMode(GL_PROJECTION);
-  glOrtho(0, 800, 600, 0, 1, -1);
+  //glOrtho(0, 800, 600, 0, 1, -1);
+		glOrtho(dom[0][0], dom[0][1], dom[1][1], dom[1][0], 1, -1);
 	}
+	
+	void initSurface() {
+		Val val = compute(of,dom,rezx,rezy);
+		Surface.assemble(val.v,val.minc,val.maxc,rezx,rezy);
+	}
+	
+	Val compute(ObjectiveFunction of, float[][] dom, int rezx, int rezy) {
+  float[][] ret = new float[rezx][rezy];
+  float pasx, pasy;
+  float px, py;
+  pasx = (dom[0][1] - dom[0][0]) / rezx;
+  pasy = (dom[1][1] - dom[1][0]) / rezy;
+  float maxc = -10000, minc = 10000;
+  int i, j;
+
+  px = dom[0][0];
+  for(i=0;i<rezx;i++)
+  {
+   py = dom[0][0];
+   for(j=0;j<rezy;j++)
+   {
+    ret[i][j] = of.f(px,py);
+    
+    if(ret[i][j] < minc) minc = ret[i][j];
+    else if(ret[i][j] > maxc) maxc = ret[i][j];
+    
+    py += pasy;
+   }
+   px += pasx;
+  }
+  
+  return new Val(ret,minc,maxc);
+ }
 	
 	void loop() {
   glMatrixMode(GL_MODELVIEW);
@@ -89,7 +131,11 @@ public class Particles {
   	
   	glClear(GL_COLOR_BUFFER_BIT);
   	
-  	drawFunction();
+  	glPushMatrix();
+  	glScalef((dom[0][1]-dom[0][0])/(float)rezx,(dom[1][1]-dom[1][0])/(float)rezy,1.0f);
+  	Surface.call();
+  	glPopMatrix();
+  	
   	drawAllParticles();
   	
   	Display.update();
@@ -97,26 +143,23 @@ public class Particles {
   }
 	}
 	
-	void drawFunction() {
-		
-	}
-	
 	void drawAllParticles() {
 		glBegin(GL_QUADS);
+
 		glColor3f(1.0f, 0.0f, 0.0f);
 		
 		float tx, ty;
 		int i;
-		for(i=0;i<np;i++) {
+		for(i=0;i<pso_np;i++) {
 			tx = x.get(i);
 			ty = y.get(i);
 			
    glVertex2f(tx,ty);
-   glVertex2f(tx+3,ty);
-   glVertex2f(tx+3,ty+3);
-   glVertex2f(tx,ty+3);
+   glVertex2f(tx+0.2f,ty);
+   glVertex2f(tx+0.2f,ty+0.2f);
+   glVertex2f(tx,ty+0.2f);
 		}
-  
+		
 		glEnd();
 	}
 	
@@ -125,51 +168,89 @@ public class Particles {
 	}
 	
 	void initCL() throws LWJGLException {
-		//kernel source code
-		/*
+		final int rangen_p1 = 3418;
+  final int rangen_p2 = 2349;
+  final int rangen_init_p1 = 3418;
+  final int rangen_init_p2 = 2349;
+  final int rangen_m = 9871;
+  
+  final String function = of.getCLStr();
+  
+  final int pso_niter = 1;
+  final float pso_atenuator = 0.8f;
+  final float pso_social = 0.7f;
+  final float pso_personal = 0.4f;
+  
 		final String source =
+				"float f(float x, float y) {" +
+			 " return " + function + "; " +
+			 "}" +
+			 "\n" +
+			 "int ran(int state) { " +
+			 " return (state * "+rangen_p1+" + "+rangen_p2+") % "+rangen_m+"; " +
+			 "} " +
+			 "\n" +
+			 "float toSub(int x) {" +
+			 " return ((float)x)/(float)"+rangen_m+"; " +
+			 "}" +
+			 "\n" +
+			 "float toInterval(float x, float s, float e) { " +
+			 " return x*(e-s) + s; " +
+			 "}" +
+			 "\n" +
+			 "int ranToInt(int state, int st, int en) { " +
+			 " return state % (en-st) + st;" +
+			 "}" +
+			 "\n" +
     "kernel void " +
     "adv(global float *x, " +
     "    global float *y, " +
     "    global float *vx," +
-    "    global float *vy) { " +
-    "  unsigned int xid = get_global_id(0); " +
+    "    global float *vy," +
+    "    global float *fit) { " +
+    " unsigned int xid = get_global_id(0); " +
+    " int rs = ran(xid*" + rangen_init_p1 + " + " + rangen_init_p2 + "); " +
+    " float x_bestp, y_bestp; " +
+    " float fit_bestp = 10000; " +
+    " int tmp1, tmp2; " +
+    " int besti; " +
+    "\n" +
+    " int iter = 0; " +
+  //  " while(iter < " + pso_niter + ") {" +
+    "  iter++; " +
+    "\n" +
+    "  fit[xid] = f(x[xid],y[xid]); " +
+    "  if(fit[xid] < fit_bestp) { " +
+    "   fit_bestp = fit[xid]; " +
+    "   x_bestp = x[xid]; " +
+    "   y_bestp = y[xid]; " +
+    "  } " +
+    "\n" +
+    "  rs = ran(rs); " +                  //this part can be expanded
+    "  tmp1 = ranToInt(rs,0,99); " +
+    "  rs = ran(rs); " +
+    "  tmp2 = ranToInt(rs,0,99); " +      //...
+    "  if(fit[tmp1] < fit[tmp2]) { " +
+    "   besti = tmp1; " +
+    "  }" +
+    "  else {" +
+    "   besti = tmp2; " +
+    "  } " +
+    "\n" +
+    "  vx[xid] = vx[xid]*0.6 + (x[besti] - x[xid])*0.3 + (x_bestp - x[xid])*0.2; " +
+    "  vy[xid] = vy[xid]*0.6 + (y[besti] - y[xid])*0.3 + (y_bestp - y[xid])*0.2; " +
     "  x[xid] += vx[xid]; " +
     "  y[xid] += vy[xid]; " +
-    "  if(x[xid] < 0 || x[xid] > 800) vx[xid] *= -1; " +
-    "  if(y[xid] < 0 || y[xid] > 600) vy[xid] *= -1; " +
-    "}"
-    ;
-		*/
-		
-		final String source =
-    "kernel void " +
-    "adv(global float *x, " +
-    "    global float *y, " +
-    "    global float *vx," +
-    "    global float *vy) { " +
-    "  unsigned int xid = get_global_id(0); " +
-    "  unsigned int xid2 = (xid+1) % 100; " +
-    "  unsigned int xid3 = (xid+2) % 100; " +
-    "  unsigned int xid4 = (xid*3+24) % 100; " +
-    "  vx[xid] = vx[xid]*0.75 + (x[xid2] - x[xid])*0.04 + (400 - x[xid])*0.001 + 4*sign(x[xid] - x[xid3])/((x[xid] - x[xid3])*(x[xid] - x[xid3])+0.4) /*+ (x[xid4] - x[xid2])*0.015*/; " +
-    "  vy[xid] = vy[xid]*0.75 + (y[xid2] - y[xid])*0.04 + (300 - y[xid])*0.001 + 4*sign(y[xid] - y[xid3])/((x[xid] - x[xid3])*(y[xid] - y[xid3])+0.4) /*+ (y[xid4] - y[xid2])*0.015*/; " +
-    "  x[xid] += vx[xid]; " +
-    "  y[xid] += vy[xid]; " +
-    "  if(x[xid] < 0) x[xid] = 0; else if(x[xid] > 800) x[xid] = 800; " +
-    "  if(y[xid] < 0) y[xid] = 0; else if(y[xid] > 600) y[xid] = 600; " +
-    /*
-    "  if(x[xid] < 0 || x[xid] > 800) vx[xid] *= -1; " +
-    "  if(y[xid] < 0 || y[xid] > 600) vy[xid] *= -1; " +
-    */
+  //  " }" +
     "}"
     ;
 		
 		//buffers
-		x = toFloatBuffer(randomFloatArray(np,0,800));
-  y = toFloatBuffer(randomFloatArray(np,0,600));
-  vx = toFloatBuffer(randomFloatArray(np,-1,1));
-  vy = toFloatBuffer(randomFloatArray(np,-1,1));
+		x = toFloatBuffer(randomFloatArray(pso_np,dom[0][0],dom[0][1]));
+  y = toFloatBuffer(randomFloatArray(pso_np,dom[1][0],dom[1][1]));
+  vx = toFloatBuffer(randomFloatArray(pso_np,dom[0][0]/10f,dom[0][1]/10f));
+  vy = toFloatBuffer(randomFloatArray(pso_np,dom[1][0]/10f,dom[1][1]/10f));
+  fit = toFloatBuffer(zeroFloatArray(pso_np));
   
   //cl creation
   CL.create();
@@ -184,8 +265,10 @@ public class Particles {
   clEnqueueWriteBuffer(queue, yMem, 1, 0, y, null, null);
   vxMem = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, vx, null);
   clEnqueueWriteBuffer(queue, vxMem, 1, 0, vx, null, null);
-  vyMem = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, vy, null); //CL_MEM_WRITE_ONLY
+  vyMem = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, vy, null);
   clEnqueueWriteBuffer(queue, vyMem, 1, 0, vy, null, null);
+  fitMem = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, fit, null);
+  clEnqueueWriteBuffer(queue, fitMem, 1, 0, fit, null, null);
   clFinish(queue);
   
   //kernel creation
@@ -194,17 +277,19 @@ public class Particles {
   kernel = clCreateKernel(program,"adv",null);
   
   kernel1DGlobalWorkSize = BufferUtils.createPointerBuffer(1);
-  kernel1DGlobalWorkSize.put(0,np);
+  kernel1DGlobalWorkSize.put(0,pso_np);
   kernel.setArg(0,xMem);
   kernel.setArg(1,yMem);
   kernel.setArg(2,vxMem);
   kernel.setArg(3,vyMem);
+  kernel.setArg(4,fitMem);
 	}
 	
 	void stepCL() {
   clEnqueueNDRangeKernel(queue, kernel, 1, null, kernel1DGlobalWorkSize, null, null, null);
   clEnqueueReadBuffer(queue, xMem, 1, 0, x, null, null);
   clEnqueueReadBuffer(queue, yMem, 1, 0, y, null, null);
+  clEnqueueReadBuffer(queue, fitMem, 1, 0, fit, null, null);
   clFinish(queue);
 	}
 	
@@ -215,6 +300,16 @@ public class Particles {
   clReleaseContext(context);
   CL.destroy();
 	}
+	
+	static float[] zeroFloatArray(int n) {
+  float[] ret = new float[n];
+  
+  int i;
+  for(i=0;i<ret.length;i++)
+  	ret[i] = 0f;
+  
+  return ret;
+ }
 	
 	static float[] randomFloatArray(int n, float s, float e) {
   float[] ret = new float[n];
@@ -233,7 +328,7 @@ public class Particles {
  }
 	
 	public static void main(String[] args) throws LWJGLException {
-  Particles instance = new Particles();
+  PSO instance = new PSO();
   instance.start();
   System.exit(0);
 	}

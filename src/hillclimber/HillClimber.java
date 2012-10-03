@@ -64,7 +64,7 @@ public class HillClimber {
   final int rangen_p2 = 2349;
   final int rangen_init_p1 = 3418;
   final int rangen_init_p2 = 2349;
-  final int m = 9871;
+  final int rangen_m = 9871;
   
   final float[][] dom = {{-5.12f, 5.12f},{-5.12f, 5.12f}};
   final int tries = 100;
@@ -76,11 +76,11 @@ public class HillClimber {
    "}" +
    "" +
    "int ran(int state) { " +
-   " return (state * "+rangen_p1+" + "+rangen_p2+") % "+m+"; " +
+   " return (state * "+rangen_p1+" + "+rangen_p2+") % "+rangen_m+"; " +
    "} " +
    "\n" +
    "float toSub(int x) {" +
-   " return ((float)x)/(float)"+m+"; " +
+   " return ((float)x)/(float)"+rangen_m+"; " +
    "}" +
    "\n" +
    "float toInterval(float x, float s, float e) {" +
