@@ -17,15 +17,9 @@
  * along with OCLEx. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package pso;
+package pso.OF;
 
-public class Rastrigin implements ObjectiveFunction {
- public String getCLStr() { 
- 	final String tmpstr = "0";
-  return "20 + (x-"+tmpstr+")*(x-"+tmpstr+") + (y-"+tmpstr+")*(y-"+tmpstr+") + cos(x*6.2831)*10 + cos(y*6.2831)*10";
- }
-	
-	public float f(float x, float y) {
-		return (float)(20 + x*x + y*y + Math.cos(6.2831*x)*10 + Math.cos(6.2831*y)*10);
-	}
+public interface ObjectiveFunction {
+ String getCLStr();
+ float f(float x, float y);
 }

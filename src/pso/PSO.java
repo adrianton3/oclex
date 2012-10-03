@@ -37,6 +37,9 @@ import org.lwjgl.opencl.Util;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 
+import pso.OF.ObjectiveFunction;
+import pso.OF.Rastrigin;
+
 import static org.lwjgl.opencl.CL10.*;
 import static org.lwjgl.opengl.GL11.*;
 
@@ -146,7 +149,7 @@ public class PSO {
 	void drawAllParticles() {
 		glBegin(GL_QUADS);
 
-		glColor3f(1.0f, 0.0f, 0.0f);
+		glColor3f(0.0f, 0.0f, 0.0f);
 		
 		float tx, ty;
 		int i;
@@ -154,10 +157,10 @@ public class PSO {
 			tx = x.get(i);
 			ty = y.get(i);
 			
-   glVertex2f(tx,ty);
-   glVertex2f(tx+0.2f,ty);
-   glVertex2f(tx+0.2f,ty+0.2f);
-   glVertex2f(tx,ty+0.2f);
+   glVertex2f(tx-0.05f,ty-0.05f);
+   glVertex2f(tx+0.05f,ty-0.05f);
+   glVertex2f(tx+0.05f,ty+0.05f);
+   glVertex2f(tx-0.05f,ty+0.05f);
 		}
 		
 		glEnd();
