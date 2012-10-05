@@ -89,7 +89,6 @@ public class Particles {
   	
   	glClear(GL_COLOR_BUFFER_BIT);
   	
-  	drawFunction();
   	drawAllParticles();
   	
   	Display.update();
@@ -97,16 +96,32 @@ public class Particles {
   }
 	}
 	
-	void drawFunction() {
-		
-	}
-	
 	void drawAllParticles() {
+		float tx, ty, otx, oty;
+		int i;
+		/*
+		glBegin(GL_LINES);
+		glColor3f(0.9f, 0.9f, 0.9f);
+		
+		i = 0;
+		otx = x.get(i);
+		oty = y.get(i);
+		for(i=1;i<np;i++) {
+			tx = x.get(i);
+			ty = y.get(i);
+			
+   glVertex2f(otx,oty);
+   glVertex2f(tx,ty);
+   
+   otx = tx;
+   oty = ty;
+		}
+  
+		glEnd();
+		*/
 		glBegin(GL_QUADS);
 		glColor3f(1.0f, 0.0f, 0.0f);
 		
-		float tx, ty;
-		int i;
 		for(i=0;i<np;i++) {
 			tx = x.get(i);
 			ty = y.get(i);
@@ -125,58 +140,21 @@ public class Particles {
 	}
 	
 	void initCL() throws LWJGLException {
-		//kernel source code
-		/*
+  final float mindist = 50;
 		final String source =
     "kernel void " +
     "adv(global float *x, " +
     "    global float *y, " +
     "    global float *vx," +
     "    global float *vy) { " +
-    "  unsigned int xid = get_global_id(0); " +
-    "  x[xid] += vx[xid]; " +
-    "  y[xid] += vy[xid]; " +
-    "  if(x[xid] < 0 || x[xid] > 800) vx[xid] *= -1; " +
-    "  if(y[xid] < 0 || y[xid] > 600) vy[xid] *= -1; " +
-    "}"
-    ;
-		*/
-		/*
-		final String source =
-    "kernel void " +
-    "adv(global float *x, " +
-    "    global float *y, " +
-    "    global float *vx," +
-    "    global float *vy) { " +
-    "  unsigned int xid = get_global_id(0); " +
-    "  unsigned int xid2 = (xid+1) % 100; " +
-    "  unsigned int xid3 = (xid+2) % 100; " +
-    "  unsigned int xid4 = (xid*3+24) % 100; " +
-    "  vx[xid] = vx[xid]*0.75 + (x[xid2] - x[xid])*0.04 + (400 - x[xid])*0.001 + 4*sign(x[xid] - x[xid3])/((x[xid] - x[xid3])*(x[xid] - x[xid3])+0.4); " +
-    "  vy[xid] = vy[xid]*0.75 + (y[xid2] - y[xid])*0.04 + (300 - y[xid])*0.001 + 4*sign(y[xid] - y[xid3])/((x[xid] - x[xid3])*(y[xid] - y[xid3])+0.4); " +
-    "  x[xid] += vx[xid]; " +
-    "  y[xid] += vy[xid]; " +
-    "  if(x[xid] < 0) x[xid] = 0; else if(x[xid] > 800) x[xid] = 800; " +
-    "  if(y[xid] < 0) y[xid] = 0; else if(y[xid] > 600) y[xid] = 600; " +
-    "  if(x[xid] < 0 || x[xid] > 800) vx[xid] *= -1; " +
-    "  if(y[xid] < 0 || y[xid] > 600) vy[xid] *= -1; " +
-    "}"
-    ; */
-  final float mindist = 100;
-  
-		final String source =
-    "kernel void " +
-    "adv(global float *x, " +
-    "    global float *y, " +
-    "    global float *vx," +
-    "    global float *vy) { " +
-    "  unsigned int xid = get_global_id(0); " +
+    " unsigned int xid = get_global_id(0); " +
+    " unsigned int xid2 = (xid + 1) % "+np+"; " +
     "\n" +
     " int i; " +
     " float dx, dy; " +
     " float dist, rap; " +
-    " vx[xid] *= 0.98; " +
-    " vy[xid] *= 0.98; " +
+    " vx[xid] *= 0.7; " +
+    " vy[xid] *= 0.7; " +
     "\n" +
     " for(i=0;i<"+np+";i++) { " +
     "  dx = x[i] - x[xid]; " +
@@ -185,19 +163,18 @@ public class Particles {
     "\n" +
     "  if(dist < "+mindist+") { " +
     "   rap = ("+mindist+"-dist)/"+mindist+"; " +
-    "   vx[xid] -= dx * rap * 0.2; " +
-    "   vy[xid] -= dy * rap * 0.2; " + 
+    "   vx[xid] -= dx * rap * 0.02; " +
+    "   vy[xid] -= dy * rap * 0.02; " + 
     "  } " +
     "\n" +
     " } " +
+    " vx[xid] += (x[xid2] - x[xid])*0.05; " +
+    " vy[xid] += (y[xid2] - y[xid])*0.05; " +
     " x[xid] += vx[xid]; " +
     " y[xid] += vy[xid]; " +
     " if(x[xid] < 0) x[xid] = 0; else if(x[xid] > 800) x[xid] = 800; " +
     " if(y[xid] < 0) y[xid] = 0; else if(y[xid] > 600) y[xid] = 600; " +
-    //" if(x[xid] < 0 || x[xid] > 800) vx[xid] *= -1; " +
-    //" if(y[xid] < 0 || y[xid] > 600) vy[xid] *= -1; " +
-    "}"
-    ;
+    "}";
 		
 		//buffers
 		x = toFloatBuffer(randomFloatArray(np,0,800));
