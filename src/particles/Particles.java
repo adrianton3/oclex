@@ -141,7 +141,7 @@ public class Particles {
     "}"
     ;
 		*/
-		
+		/*
 		final String source =
     "kernel void " +
     "adv(global float *x, " +
@@ -152,24 +152,58 @@ public class Particles {
     "  unsigned int xid2 = (xid+1) % 100; " +
     "  unsigned int xid3 = (xid+2) % 100; " +
     "  unsigned int xid4 = (xid*3+24) % 100; " +
-    "  vx[xid] = vx[xid]*0.75 + (x[xid2] - x[xid])*0.04 + (400 - x[xid])*0.001 + 4*sign(x[xid] - x[xid3])/((x[xid] - x[xid3])*(x[xid] - x[xid3])+0.4) /*+ (x[xid4] - x[xid2])*0.015*/; " +
-    "  vy[xid] = vy[xid]*0.75 + (y[xid2] - y[xid])*0.04 + (300 - y[xid])*0.001 + 4*sign(y[xid] - y[xid3])/((x[xid] - x[xid3])*(y[xid] - y[xid3])+0.4) /*+ (y[xid4] - y[xid2])*0.015*/; " +
+    "  vx[xid] = vx[xid]*0.75 + (x[xid2] - x[xid])*0.04 + (400 - x[xid])*0.001 + 4*sign(x[xid] - x[xid3])/((x[xid] - x[xid3])*(x[xid] - x[xid3])+0.4); " +
+    "  vy[xid] = vy[xid]*0.75 + (y[xid2] - y[xid])*0.04 + (300 - y[xid])*0.001 + 4*sign(y[xid] - y[xid3])/((x[xid] - x[xid3])*(y[xid] - y[xid3])+0.4); " +
     "  x[xid] += vx[xid]; " +
     "  y[xid] += vy[xid]; " +
     "  if(x[xid] < 0) x[xid] = 0; else if(x[xid] > 800) x[xid] = 800; " +
     "  if(y[xid] < 0) y[xid] = 0; else if(y[xid] > 600) y[xid] = 600; " +
-    /*
     "  if(x[xid] < 0 || x[xid] > 800) vx[xid] *= -1; " +
     "  if(y[xid] < 0 || y[xid] > 600) vy[xid] *= -1; " +
-    */
+    "}"
+    ; */
+  final float mindist = 100;
+  
+		final String source =
+    "kernel void " +
+    "adv(global float *x, " +
+    "    global float *y, " +
+    "    global float *vx," +
+    "    global float *vy) { " +
+    "  unsigned int xid = get_global_id(0); " +
+    "\n" +
+    " int i; " +
+    " float dx, dy; " +
+    " float dist, rap; " +
+    " vx[xid] *= 0.98; " +
+    " vy[xid] *= 0.98; " +
+    "\n" +
+    " for(i=0;i<"+np+";i++) { " +
+    "  dx = x[i] - x[xid]; " +
+    "  dy = y[i] - y[xid]; " +
+    "  dist = sqrt(dx*dx + dy*dy); " +
+    "\n" +
+    "  if(dist < "+mindist+") { " +
+    "   rap = ("+mindist+"-dist)/"+mindist+"; " +
+    "   vx[xid] -= dx * rap * 0.2; " +
+    "   vy[xid] -= dy * rap * 0.2; " + 
+    "  } " +
+    "\n" +
+    " } " +
+    " x[xid] += vx[xid]; " +
+    " y[xid] += vy[xid]; " +
+    " if(x[xid] < 0) x[xid] = 0; else if(x[xid] > 800) x[xid] = 800; " +
+    " if(y[xid] < 0) y[xid] = 0; else if(y[xid] > 600) y[xid] = 600; " +
+    //" if(x[xid] < 0 || x[xid] > 800) vx[xid] *= -1; " +
+    //" if(y[xid] < 0 || y[xid] > 600) vy[xid] *= -1; " +
     "}"
     ;
 		
 		//buffers
 		x = toFloatBuffer(randomFloatArray(np,0,800));
   y = toFloatBuffer(randomFloatArray(np,0,600));
-  vx = toFloatBuffer(randomFloatArray(np,-1,1));
-  vy = toFloatBuffer(randomFloatArray(np,-1,1));
+  vx = toFloatBuffer(randomFloatArray(np,-10,10));
+  vy = toFloatBuffer(randomFloatArray(np,-10,10));
   
   //cl creation
   CL.create();
