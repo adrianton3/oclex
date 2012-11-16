@@ -37,6 +37,8 @@ import org.lwjgl.opencl.Util;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 
+import common.Buffer;
+
 import pso.OF.ObjectiveFunction;
 import pso.OF.Rastrigin;
 
@@ -44,7 +46,9 @@ import static org.lwjgl.opencl.CL10.*;
 import static org.lwjgl.opengl.GL11.*;
 
 public class PSO {
-	final int pso_np = 100;
+	RanGen ranGen = new RanGen();
+	PSOParam psoParam = new PSOParam(100,0.6f,0.3f,4);
+	
 	FloatBuffer x;
 	FloatBuffer y;
 	FloatBuffer vx;
@@ -63,7 +67,7 @@ public class PSO {
 	CLKernel kernel;
 	
 	final ObjectiveFunction of = new Rastrigin();
-	final float[][] dom = {{-5.12f, 5.12f},{-5.12f, 5.12f}};
+	final float[][] dom = {{-5.12f, 5.12f},{-5.12f, 5.12f}}; //symmetric intervals at the moment
 	final int rezx = 200;
 	final int rezy = 200;
 	
@@ -153,7 +157,7 @@ public class PSO {
 		
 		float tx, ty;
 		int i;
-		for(i=0;i<pso_np;i++) {
+		for(i=0;i<psoParam.nParticles;i++) {
 			tx = x.get(i);
 			ty = y.get(i);
 			
@@ -171,89 +175,14 @@ public class PSO {
 	}
 	
 	void initCL() throws LWJGLException {
-		final int rangen_p1 = 3418;
-  final int rangen_p2 = 2349;
-  final int rangen_init_p1 = 3418;
-  final int rangen_init_p2 = 2349;
-  final int rangen_m = 9871;
-  
-  final String function = of.getCLStr();
-  
-  final int pso_niter = 1;
-  final float pso_atenuator = 0.8f;
-  final float pso_social = 0.7f;
-  final float pso_personal = 0.4f;
-  
-		final String source =
-				"float f(float x, float y) {" +
-			 " return " + function + "; " +
-			 "}" +
-			 "\n" +
-			 "int ran(int state) { " +
-			 " return (state * "+rangen_p1+" + "+rangen_p2+") % "+rangen_m+"; " +
-			 "} " +
-			 "\n" +
-			 "float toSub(int x) {" +
-			 " return ((float)x)/(float)"+rangen_m+"; " +
-			 "}" +
-			 "\n" +
-			 "float toInterval(float x, float s, float e) { " +
-			 " return x*(e-s) + s; " +
-			 "}" +
-			 "\n" +
-			 "int ranToInt(int state, int st, int en) { " +
-			 " return state % (en-st) + st;" +
-			 "}" +
-			 "\n" +
-    "kernel void " +
-    "adv(global float *x, " +
-    "    global float *y, " +
-    "    global float *vx," +
-    "    global float *vy," +
-    "    global float *fit) { " +
-    " unsigned int xid = get_global_id(0); " +
-    " int rs = ran(xid*" + rangen_init_p1 + " + " + rangen_init_p2 + "); " +
-    " float x_bestp, y_bestp; " +
-    " float fit_bestp = 10000; " +
-    " int tmp1, tmp2; " +
-    " int besti; " +
-    "\n" +
-    " int iter = 0; " +
-  //  " while(iter < " + pso_niter + ") {" +
-    "  iter++; " +
-    "\n" +
-    "  fit[xid] = f(x[xid],y[xid]); " +
-    "  if(fit[xid] < fit_bestp) { " +
-    "   fit_bestp = fit[xid]; " +
-    "   x_bestp = x[xid]; " +
-    "   y_bestp = y[xid]; " +
-    "  } " +
-    "\n" +
-    "  rs = ran(rs); " +                  //this part can be expanded
-    "  tmp1 = ranToInt(rs,0,99); " +
-    "  rs = ran(rs); " +
-    "  tmp2 = ranToInt(rs,0,99); " +      //...
-    "  if(fit[tmp1] < fit[tmp2]) { " +
-    "   besti = tmp1; " +
-    "  }" +
-    "  else {" +
-    "   besti = tmp2; " +
-    "  } " +
-    "\n" +
-    "  vx[xid] = vx[xid]*0.6 + (x[besti] - x[xid])*0.3 + (x_bestp - x[xid])*0.2; " +
-    "  vy[xid] = vy[xid]*0.6 + (y[besti] - y[xid])*0.3 + (y_bestp - y[xid])*0.2; " +
-    "  x[xid] += vx[xid]; " +
-    "  y[xid] += vy[xid]; " +
-  //  " }" +
-    "}"
-    ;
+		final String source = KernelBuilder.create(ranGen,psoParam,of);
 		
 		//buffers
-		x = toFloatBuffer(randomFloatArray(pso_np,dom[0][0],dom[0][1]));
-  y = toFloatBuffer(randomFloatArray(pso_np,dom[1][0],dom[1][1]));
-  vx = toFloatBuffer(randomFloatArray(pso_np,dom[0][0]/10f,dom[0][1]/10f));
-  vy = toFloatBuffer(randomFloatArray(pso_np,dom[1][0]/10f,dom[1][1]/10f));
-  fit = toFloatBuffer(zeroFloatArray(pso_np));
+		x = Buffer.toFloatBuffer(Buffer.randomFloatArray(psoParam.nParticles,dom[0][0],dom[0][1]));
+  y = Buffer.toFloatBuffer(Buffer.randomFloatArray(psoParam.nParticles,dom[1][0],dom[1][1]));
+  vx = Buffer.toFloatBuffer(Buffer.randomFloatArray(psoParam.nParticles,dom[0][0]/10f,dom[0][1]/10f));
+  vy = Buffer.toFloatBuffer(Buffer.randomFloatArray(psoParam.nParticles,dom[1][0]/10f,dom[1][1]/10f));
+  fit = Buffer.toFloatBuffer(Buffer.zeroFloatArray(psoParam.nParticles));
   
   //cl creation
   CL.create();
@@ -280,7 +209,7 @@ public class PSO {
   kernel = clCreateKernel(program,"adv",null);
   
   kernel1DGlobalWorkSize = BufferUtils.createPointerBuffer(1);
-  kernel1DGlobalWorkSize.put(0,pso_np);
+  kernel1DGlobalWorkSize.put(0,psoParam.nParticles);
   kernel.setArg(0,xMem);
   kernel.setArg(1,yMem);
   kernel.setArg(2,vxMem);
@@ -303,32 +232,6 @@ public class PSO {
   clReleaseContext(context);
   CL.destroy();
 	}
-	
-	static float[] zeroFloatArray(int n) {
-  float[] ret = new float[n];
-  
-  int i;
-  for(i=0;i<ret.length;i++)
-  	ret[i] = 0f;
-  
-  return ret;
- }
-	
-	static float[] randomFloatArray(int n, float s, float e) {
-  float[] ret = new float[n];
-  
-  int i;
-  for(i=0;i<ret.length;i++)
-  	ret[i] = (float)(Math.random()*(e-s)+s);
-  
-  return ret;
- }
-	
-	static FloatBuffer toFloatBuffer(float[] floats) {
-  FloatBuffer buf = BufferUtils.createFloatBuffer(floats.length).put(floats);
-  buf.rewind();
-  return buf;
- }
 	
 	public static void main(String[] args) throws LWJGLException {
   PSO instance = new PSO();

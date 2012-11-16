@@ -71,7 +71,7 @@ public class Shadow {
 	void initGL() {
 		try {
    Display.setDisplayMode(new DisplayMode(800,600));
-   Display.setTitle("OpenCL Particle Demo");
+   Display.setTitle("OpenCL Shadows Demo");
    Display.create();
   } catch (LWJGLException e) {
    e.printStackTrace();

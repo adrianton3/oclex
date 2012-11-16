@@ -17,13 +17,14 @@
  * along with OCLEx. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package shadow;
+package common;
 
-public class TwoFloatAr {
- final float[] x, y;
- 
- TwoFloatAr(float[] x, float[] y) {
- 	this.x = x;
- 	this.y = y;
- }
+public class ValIndex {
+	public final float val;
+	public final int index;
+
+	ValIndex(float val, int index) {
+		this.val = val;
+		this.index = index;
+	}
 }

@@ -17,13 +17,18 @@
  * along with OCLEx. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package shadow;
+package pso;
 
-public class TwoFloatAr {
- final float[] x, y;
+public class PSOParam {
+	final int nParticles;
+	final float atenuator;
+ final float social;
+ final int connectivity;
  
- TwoFloatAr(float[] x, float[] y) {
- 	this.x = x;
- 	this.y = y;
+ PSOParam(int nParticles, float atenuator, float social, int connectivity) {
+ 	this.nParticles = nParticles;
+ 	this.atenuator = atenuator;
+ 	this.social = social;
+ 	this.connectivity = connectivity;
  }
 }

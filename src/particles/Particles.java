@@ -37,11 +37,13 @@ import org.lwjgl.opencl.Util;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 
+import common.Buffer;
+
 import static org.lwjgl.opencl.CL10.*;
 import static org.lwjgl.opengl.GL11.*;
 
 public class Particles {
-	final int np = 100;
+	final int nParticles = 100;
 	FloatBuffer x;
 	FloatBuffer y;
 	FloatBuffer vx;
@@ -97,32 +99,13 @@ public class Particles {
 	}
 	
 	void drawAllParticles() {
-		float tx, ty, otx, oty;
+		float tx, ty;
 		int i;
-		/*
-		glBegin(GL_LINES);
-		glColor3f(0.9f, 0.9f, 0.9f);
 		
-		i = 0;
-		otx = x.get(i);
-		oty = y.get(i);
-		for(i=1;i<np;i++) {
-			tx = x.get(i);
-			ty = y.get(i);
-			
-   glVertex2f(otx,oty);
-   glVertex2f(tx,ty);
-   
-   otx = tx;
-   oty = ty;
-		}
-  
-		glEnd();
-		*/
 		glBegin(GL_QUADS);
 		glColor3f(1.0f, 0.0f, 0.0f);
 		
-		for(i=0;i<np;i++) {
+		for(i=0;i<nParticles;i++) {
 			tx = x.get(i);
 			ty = y.get(i);
 			
@@ -140,55 +123,23 @@ public class Particles {
 	}
 	
 	void initCL() throws LWJGLException {
-  final float mindist = 50;
-		final String source =
-    "kernel void " +
-    "adv(global float *x, " +
-    "    global float *y, " +
-    "    global float *vx," +
-    "    global float *vy) { " +
-    " unsigned int xid = get_global_id(0); " +
-    " unsigned int xid2 = (xid + 1) % "+np+"; " +
-    "\n" +
-    " int i; " +
-    " float dx, dy; " +
-    " float dist, rap; " +
-    " vx[xid] *= 0.7; " +
-    " vy[xid] *= 0.7; " +
-    "\n" +
-    " for(i=0;i<"+np+";i++) { " +
-    "  dx = x[i] - x[xid]; " +
-    "  dy = y[i] - y[xid]; " +
-    "  dist = sqrt(dx*dx + dy*dy); " +
-    "\n" +
-    "  if(dist < "+mindist+") { " +
-    "   rap = ("+mindist+"-dist)/"+mindist+"; " +
-    "   vx[xid] -= dx * rap * 0.02; " +
-    "   vy[xid] -= dy * rap * 0.02; " + 
-    "  } " +
-    "\n" +
-    " } " +
-    " vx[xid] += (x[xid2] - x[xid])*0.05; " +
-    " vy[xid] += (y[xid2] - y[xid])*0.05; " +
-    " x[xid] += vx[xid]; " +
-    " y[xid] += vy[xid]; " +
-    " if(x[xid] < 0) x[xid] = 0; else if(x[xid] > 800) x[xid] = 800; " +
-    " if(y[xid] < 0) y[xid] = 0; else if(y[xid] > 600) y[xid] = 600; " +
-    "}";
+  final float minDist = 50;
+		final String source = KernelBuilder.create(nParticles,minDist);
 		
 		//buffers
-		x = toFloatBuffer(randomFloatArray(np,0,800));
-  y = toFloatBuffer(randomFloatArray(np,0,600));
-  vx = toFloatBuffer(randomFloatArray(np,-10,10));
-  vy = toFloatBuffer(randomFloatArray(np,-10,10));
+		x = Buffer.toFloatBuffer(Buffer.randomFloatArray(nParticles,0,800));
+  y = Buffer.toFloatBuffer(Buffer.randomFloatArray(nParticles,0,600));
+  vx = Buffer.toFloatBuffer(Buffer.randomFloatArray(nParticles,-10,10));
+  vy = Buffer.toFloatBuffer(Buffer.randomFloatArray(nParticles,-10,10));
   
-  //cl creation
+  //CL creation
   CL.create();
   platform = CLPlatform.getPlatforms().get(0);
   devices = platform.getDevices(CL_DEVICE_TYPE_GPU);
   context = CLContext.create(platform, devices, null, null, null);
   queue = clCreateCommandQueue(context, devices.get(0), CL_QUEUE_PROFILING_ENABLE, null);
   
+  //memory management
   xMem = clCreateBuffer(context,CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, x, null);
   clEnqueueWriteBuffer(queue, xMem, 1, 0, x, null, null);
   yMem = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, y, null);
@@ -205,7 +156,7 @@ public class Particles {
   kernel = clCreateKernel(program,"adv",null);
   
   kernel1DGlobalWorkSize = BufferUtils.createPointerBuffer(1);
-  kernel1DGlobalWorkSize.put(0,np);
+  kernel1DGlobalWorkSize.put(0,nParticles);
   kernel.setArg(0,xMem);
   kernel.setArg(1,yMem);
   kernel.setArg(2,vxMem);
@@ -226,22 +177,6 @@ public class Particles {
   clReleaseContext(context);
   CL.destroy();
 	}
-	
-	static float[] randomFloatArray(int n, float s, float e) {
-  float[] ret = new float[n];
-  
-  int i;
-  for(i=0;i<ret.length;i++)
-  	ret[i] = (float)(Math.random()*(e-s)+s);
-  
-  return ret;
- }
-	
-	static FloatBuffer toFloatBuffer(float[] floats) {
-  FloatBuffer buf = BufferUtils.createFloatBuffer(floats.length).put(floats);
-  buf.rewind();
-  return buf;
- }
 	
 	public static void main(String[] args) throws LWJGLException {
   Particles instance = new Particles();

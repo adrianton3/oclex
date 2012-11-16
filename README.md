@@ -6,5 +6,5 @@ Experiments included so far:
 
 1. Repulsive particles
 2. Stochastic optimization through some variant of the hill climbing algorithm 
-3. Particle Swarm Optimization
+3. Simplified Particle Swarm Optimization
 4. 2D shadows

@@ -17,13 +17,12 @@
  * along with OCLEx. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package shadow;
+package hillclimber;
 
-public class TwoFloatAr {
- final float[] x, y;
- 
- TwoFloatAr(float[] x, float[] y) {
- 	this.x = x;
- 	this.y = y;
- }
+public class RanGen {
+	final int a = 3418;
+ final int c = 2349;
+ final int aInit = 3418;
+ final int cInit = 2349;
+ final int m = 9871;
 }

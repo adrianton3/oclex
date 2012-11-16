@@ -35,10 +35,13 @@ import org.lwjgl.opencl.CLContext;
 import org.lwjgl.opencl.CLDevice;
 import org.lwjgl.opencl.CLPlatform;
 
+import common.Buffer;
+import common.ValIndex;
+
 import static org.lwjgl.opencl.CL10.*;
 
 public class HillClimber {
-	final int np = 100;
+	final int nClimbers = 100;
 	FloatBuffer x, y, ans;
 	
 	CLPlatform platform;
@@ -60,78 +63,13 @@ public class HillClimber {
 	}
 	
 	String packKernel() {
-		final int rangen_p1 = 3418;
-  final int rangen_p2 = 2349;
-  final int rangen_init_p1 = 3418;
-  final int rangen_init_p2 = 2349;
-  final int rangen_m = 9871;
-  
+		final RanGen ranGen = new RanGen(); 
   final float[][] dom = {{-5.12f, 5.12f},{-5.12f, 5.12f}};
-  final int tries = 100;
+  final int nTries = 100;
   final String function = "x*x + y*y";
- 	
- 	final String source =
-   "float f(float x, float y) {" +
-   " return " + function + "; " +
-   "}" +
-   "" +
-   "int ran(int state) { " +
-   " return (state * "+rangen_p1+" + "+rangen_p2+") % "+rangen_m+"; " +
-   "} " +
-   "\n" +
-   "float toSub(int x) {" +
-   " return ((float)x)/(float)"+rangen_m+"; " +
-   "}" +
-   "\n" +
-   "float toInterval(float x, float s, float e) {" +
-   " return x*(e-s) + s;" +
-   "}" +
-   "\n" +
-   "kernel void climb(global float *x, global float *y, global float *ans) { " +
-   " unsigned int xid = get_global_id(0); " +
-   " int rs = ran(xid*" + rangen_init_p1 + " + " + rangen_init_p2 + "); " +
-   "\n" +
-   " const float sx = " + dom[0][0] + ", ex = " + dom[0][1] + "; " +
-   " const float sy = " + dom[1][0] + ", ey = " + dom[1][1] + "; " +
-   "\n" +
-   " float lx, ly;" +
-   "\n" +
-   " rs = ran(rs); " +
-   " lx = toInterval(toSub(rs),sx,ex); " +
-   " rs = ran(rs); " +
-   " ly = toInterval(toSub(rs),sy,ey); " +
-   "\n" +
-   " float px, py; " +
-   " rs = ran(rs); " +
-   " px = toInterval(toSub(rs),-0.1,0.1); " +
-   " rs = ran(rs); " +
-   " py = toInterval(toSub(rs),-0.1,0.1); " +
-   "\n" +
-   " float nx, ny, min = 1000, tmin;" +
-   " int tries = 0; " +
-   " while(tries < " + tries + ") {" +
-   "  tries++;" +
-   "\n" +
-   "  nx = lx + px; " +
-   "  ny = ly + py; " +
-   "  tmin = f(nx,ny); " +
-   "  if(tmin < min) {" +
-   "   min = tmin; " +
-   "   lx = nx; " +
-   "   ly = ny; " +
-   "  } else {" +
-   "   rs = ran(rs); " +
-   "   px = toInterval(toSub(rs),-0.2,0.2); " +
-   "   rs = ran(rs); " +
-   "   py = toInterval(toSub(rs),-0.2,0.2); " +
-   "  }" +
-   " } " +
-   "\n" +
-   " x[xid] = lx; " +
-   " y[xid] = ly; " +
-   " ans[xid] = f(lx,ly); " +
-   "}";
- 	
+  
+ 	final String source = KernelBuilder.create(ranGen,function,dom,nTries);
+ 
  	return source;
 	}
 
@@ -139,9 +77,9 @@ public class HillClimber {
   final String source = packKernel();
    		
    //buffers
-   x = BufferUtils.createFloatBuffer(np);
-   y = BufferUtils.createFloatBuffer(np);
-   ans = BufferUtils.createFloatBuffer(np);
+   x = BufferUtils.createFloatBuffer(nClimbers);
+   y = BufferUtils.createFloatBuffer(nClimbers);
+   ans = BufferUtils.createFloatBuffer(nClimbers);
      
    //cl creation
    CL.create();
@@ -159,9 +97,9 @@ public class HillClimber {
    program = clCreateProgramWithSource(context,source,null);
    Util.checkCLError(clBuildProgram(program,devices.get(0),"",null));
    kernel = clCreateKernel(program,"climb",null);
-    
+   
    kernel1DGlobalWorkSize = BufferUtils.createPointerBuffer(1);
-   kernel1DGlobalWorkSize.put(0,np);
+   kernel1DGlobalWorkSize.put(0,nClimbers);
    kernel.setArg(0,xMem);
    kernel.setArg(1,yMem);
    kernel.setArg(2,ansMem);
@@ -184,72 +122,17 @@ public class HillClimber {
   }
   
   void processResults() throws Exception {
-  	System.out.print("x: ");	print(x);
-  	System.out.print("y: ");	print(y);
-  	System.out.print("f(x,y): ");	print(ans);
+  	System.out.print("x: ");	Buffer.print(x);
+  	System.out.print("y: ");	Buffer.print(y);
+  	System.out.print("f(x,y): ");	Buffer.print(ans);
   	
-  	PosVal pv = min(ans);
-  	System.out.println("Min: ((" + x.get(pv.pos) + "," + y.get(pv.pos) + "), " + pv.val +")");
-  }
-  
-  static PosVal min(FloatBuffer buffer) throws Exception {
-   if(buffer.capacity() <= 0) throw new Exception("buffer.capacity() <= 0");
-   if(buffer.capacity() == 1) return new PosVal(1,buffer.get());
-   
-   float min = buffer.get(0);
-   int mini = 0;
-   float tmp;
-   
-  	for (int i = 0; i < buffer.capacity(); i++) {
-    tmp = buffer.get(i);
-    if(tmp < min) {
-    	min = tmp;
-    	mini = i;
-    }
-   }
-  	
-   return new PosVal(mini,min);
-  }
-
-  static FloatBuffer toFloatBuffer(float[] floats) {
-   FloatBuffer buf = BufferUtils.createFloatBuffer(floats.length).put(floats);
-   buf.rewind();
-   return buf;
-  }
-    
-  static IntBuffer toIntBuffer(int[] ints) {
-   IntBuffer buf = BufferUtils.createIntBuffer(ints.length).put(ints);
-   buf.rewind();
-   return buf;
-  }
-
-  static void print(FloatBuffer buffer) {
-   for (int i = 0; i < buffer.capacity(); i++) {
-    System.out.print(buffer.get(i)+" ");
-   }
-   System.out.println("");
-  }
-    
-  static void print(IntBuffer buffer) {
-	  for (int i = 0; i < buffer.capacity(); i++) {
-	   System.out.print(buffer.get(i)+" ");
-	  }
-	  System.out.println("");
+  	ValIndex pv = Buffer.min(ans);
+  	System.out.println("Min: ((" + x.get(pv.index) + "," + y.get(pv.index) + "), " + pv.val +")");
   }
 
 	public static void main(String[] args) throws Exception {
 	 HillClimber instance = new HillClimber();
 	 instance.start();
 	 System.exit(0);
-	}
-}
-
-class PosVal {
-	final int pos;
-	final float val;
-	
-	PosVal(int pos,float val) {
-		this.pos = pos;
-		this.val = val;
 	}
 }
