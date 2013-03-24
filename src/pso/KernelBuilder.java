@@ -19,7 +19,7 @@
 
 package pso;
 
-import pso.OF.ObjectiveFunction;
+import pso.of.ObjectiveFunction;
 
 public class KernelBuilder {
  private static String createNetwork(PSOParam psoParam) {

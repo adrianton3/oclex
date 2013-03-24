@@ -17,7 +17,7 @@
  * along with OCLEx. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package pso.OF;
+package pso.of;
 
 public interface ObjectiveFunction {
  String getCLStr();
