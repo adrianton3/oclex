@@ -19,6 +19,7 @@
 
 package common;
 
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
@@ -26,28 +27,36 @@ import org.lwjgl.BufferUtils;
 
 public class Buffer {
 	public static FloatBuffer toFloatBuffer(float[] floats) {
-  FloatBuffer buf = BufferUtils.createFloatBuffer(floats.length).put(floats);
-  buf.rewind();
-  return buf;
- }
-   
+		FloatBuffer buf = BufferUtils.createFloatBuffer(floats.length).put(floats);
+		buf.rewind();
+		return buf;
+	}
+
 	public static IntBuffer toIntBuffer(int[] ints) {
-  IntBuffer buf = BufferUtils.createIntBuffer(ints.length).put(ints);
-  buf.rewind();
-  return buf;
- }
+		IntBuffer buf = BufferUtils.createIntBuffer(ints.length).put(ints);
+		buf.rewind();
+		return buf;
+	}
 	
+	public static ByteBuffer toByteBuffer(byte[] bytes) {
+		ByteBuffer buf = BufferUtils.createByteBuffer(bytes.length).put(bytes);
+		buf.rewind();
+		return buf;
+	}
+
 	public static ValIndex min(FloatBuffer buffer) throws Exception {
-		if (buffer.capacity() <= 0)	throw new Exception("buffer.capacity() <= 0");
-		if (buffer.capacity() == 1)	return new ValIndex(buffer.get(),1);
+		if(buffer.capacity() <= 0)
+			throw new Exception("buffer.capacity() <= 0");
+		if(buffer.capacity() == 1)
+			return new ValIndex(buffer.get(), 1);
 
 		float min = buffer.get(0);
 		int mini = 0;
 		float tmp;
 
-		for (int i = 0; i < buffer.capacity(); i++) {
+		for(int i = 0; i < buffer.capacity(); i++) {
 			tmp = buffer.get(i);
-			if (tmp < min) {
+			if(tmp < min) {
 				min = tmp;
 				mini = i;
 			}
@@ -56,37 +65,66 @@ public class Buffer {
 		return new ValIndex(min, mini);
 	}
 
+	public static int[] constIntArray(int n, int c) {
+		int[] ret = new int[n];
+
+		for(int i = 0; i < ret.length; i++)
+			ret[i] = c;
+
+		return ret;
+	}
+	
+	public static int[] zeroIntArray(int n) {
+		return constIntArray(n, 0);
+	}
+	
+	public static int[] rangeIntArray(int n, int start, int step) {
+		int[] ret = new int[n];
+
+		for(int i = 0, cur = start; i < ret.length; i++, cur += step)
+			ret[i] = cur;
+
+		return ret;
+	}
+	
+	public static int[] randomIntArray(int n, int s, int e) {
+		int[] ret = new int[n];
+
+		for(int i = 0; i < ret.length; i++)
+			ret[i] = (int)Math.floor(Math.random() * (e - s) + s);
+
+		return ret;
+	}
+	
 	public static float[] zeroFloatArray(int n) {
-  float[] ret = new float[n];
-  
-  int i;
-  for(i=0;i<ret.length;i++)
-  	ret[i] = 0f;
-  
-  return ret;
- }
-	
+		float[] ret = new float[n];
+
+		for(int i = 0; i < ret.length; i++)
+			ret[i] = 0f;
+
+		return ret;
+	}
+
 	public static float[] randomFloatArray(int n, float s, float e) {
-  float[] ret = new float[n];
-  
-  int i;
-  for(i=0;i<ret.length;i++)
-  	ret[i] = (float)(Math.random()*(e-s)+s);
-  
-  return ret;
- }
-	
- public static void print(FloatBuffer buffer) {
-  for (int i = 0; i < buffer.capacity(); i++) {
-   System.out.print(buffer.get(i)+" ");
-  }
-  System.out.println();
- }
-   
- public static void print(IntBuffer buffer) {
-  for (int i = 0; i < buffer.capacity(); i++) {
-   System.out.print(buffer.get(i)+" ");
-  }
-  System.out.println();
- }
+		float[] ret = new float[n];
+
+		for(int i = 0; i < ret.length; i++)
+			ret[i] = (float) (Math.random() * (e - s) + s);
+
+		return ret;
+	}
+
+	public static void print(FloatBuffer buffer) {
+		for(int i = 0; i < buffer.capacity(); i++) {
+			System.out.print(buffer.get(i) + " ");
+		}
+		System.out.println();
+	}
+
+	public static void print(IntBuffer buffer) {
+		for(int i = 0; i < buffer.capacity(); i++) {
+			System.out.print(buffer.get(i) + " ");
+		}
+		System.out.println();
+	}
 }

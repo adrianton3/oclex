@@ -110,7 +110,7 @@ public class SimpleImageDemo {
 		context = CLContext.create(platform, devices, null, null, null);
 		device = devices.get(0);
 		
-		queue = clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, null);
+		queue = clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, null);
 
 		// kernel creation
 		program = clCreateProgramWithSource(context, packKernel(), null);
